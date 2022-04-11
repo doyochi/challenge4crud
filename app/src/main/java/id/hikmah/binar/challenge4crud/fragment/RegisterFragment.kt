@@ -5,56 +5,111 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.navigation.fragment.findNavController
 import id.hikmah.binar.challenge4crud.R
+import id.hikmah.binar.challenge4crud.database.NoteData
+import id.hikmah.binar.challenge4crud.databinding.FragmentRegisterBinding
+import id.hikmah.binar.challenge4crud.model.User
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [RegisterFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
 class RegisterFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-    }
+    private var _binding: FragmentRegisterBinding? = null
+    private val binding get() = _binding!!
+
+    private var mDb: NoteData? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_register, container, false)
+        _binding = FragmentRegisterBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment RegisterFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            RegisterFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
-                }
-            }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        mDb = NoteData.getInstance(requireContext())
+
+        actionRegister()
+
+    }
+
+    private fun actionRegister() {
+        binding.btnDaftar.setOnClickListener{
+            val etUsername = binding.editUsername.text.toString()
+            val etEmail = binding.editEmail.text.toString()
+            val etPassworda = binding.editPassword1.text.toString()
+            val etPasswordb = binding.editPassword2.text.toString()
+
+            if (validateRegisterInput(etUsername, etEmail, etPassworda, etPasswordb)) {
+                inputRegister(etUsername, etEmail, etPassworda)
+            }
+        }
+
+    }
+
+    private fun inputRegister(username: String, email: String, password: String) {
+        val user = User(null, username, email, password)
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = mDb?.userDao()?.insertUser(user)
+            if (result != 0L) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    findNavController().navigate(R.id.action_registerFragment_to_loginFragment)
+                    Toast.makeText(requireContext(), "Registrasi Berhasil!", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                val checkRegistered = mDb?.userDao()?.getUser(username)
+                if (checkRegistered == null){
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(
+                            requireContext(),
+                            "Username telah terdaftar",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+
+            }
+        }
+    }
+
+    private fun validateRegisterInput(username: String, email: String, passworda: String, passwordb: String): Boolean {
+
+        if (username.isEmpty()) {
+            binding.editUsername.error = "Username harus diisi"
+            return false
+        }
+
+        if (email.isEmpty()) {
+            binding.editEmail.error = "Email harus diisi"
+            return false
+        }
+
+        if (passworda.isEmpty()) {
+            binding.editPassword1.error = "Password harus diisi"
+            return false
+        }
+
+        if (passwordb.isEmpty()) {
+            binding.editPassword2.error = "Silahkan konfirmasi password"
+            return false
+        }
+
+        if (passworda != passwordb) {
+            binding.editPassword1.error = "Password yang Anda masukkan tidak cocok"
+            return false
+        }
+        return true
+    }
+
 }
